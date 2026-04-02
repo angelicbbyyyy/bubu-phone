@@ -473,6 +473,7 @@
                             <select id="aiFormat" class="settings-select">
                                 <option value="openai">OpenAI-compatible</option>
                                 <option value="anthropic">Anthropic</option>
+                                <option value="google">Google Gemini</option>
                             </select>
                         </div>
                         <div class="settings-row">
@@ -480,7 +481,7 @@
                             <div class="settings-inline-actions">
                                 <button class="settings-btn secondary" type="button" onclick="applyGoogleAIShortcut()">Use Google AI Studio</button>
                             </div>
-                            <div class="settings-hint">Fills the custom fields for Google Generative Language API. You may still need a proxy if the provider blocks browser CORS.</div>
+                            <div class="settings-hint">Fills the custom fields for the native Google Gemini REST API, which is usually more reliable in the browser than the OpenAI-compatible route.</div>
                         </div>
                     </div>
                 </div>
@@ -680,6 +681,10 @@
             if (!normalizedPath) return normalizedBase;
             return normalizedBase + (normalizedPath.startsWith('/') ? normalizedPath : '/' + normalizedPath);
         }
+        function buildGoogleChatPath(template, model) {
+            const source = String(template || '/models/{model}:generateContent');
+            return source.includes('{model}') ? source.replace('{model}', String(model || '').trim()) : source;
+        }
         function onAIProviderChange() {
             const provider = document.getElementById('aiProvider')?.value || 'openai';
             const baseUrlInput = document.getElementById('aiBaseUrl');
@@ -701,13 +706,13 @@
             document.getElementById('aiProvider').value = 'custom';
             onAIProviderChange();
             document.getElementById('aiBaseUrl').value = 'https://generativelanguage.googleapis.com/v1beta';
-            document.getElementById('aiChatPath').value = '/openai/chat/completions';
+            document.getElementById('aiChatPath').value = '/models/{model}:generateContent';
             document.getElementById('aiModelsPath').value = '/models';
-            document.getElementById('aiAuthMode').value = 'bearer';
-            document.getElementById('aiFormat').value = 'openai';
+            document.getElementById('aiAuthMode').value = 'x-api-key';
+            document.getElementById('aiFormat').value = 'google';
             setModelOptions(['gemini-2.5-flash', 'gemini-2.5-pro'], 'gemini-2.5-flash');
             const hint = document.getElementById('aiModelHint');
-            if (hint) hint.textContent = 'Google AI shortcut applied. Chat uses /openai/chat/completions and model fetch uses /models.';
+            if (hint) hint.textContent = 'Google AI shortcut applied. Chat uses the native Gemini generateContent endpoint and model fetch uses /models.';
         }
         function setModelOptions(models, selectedValue) {
             const modelSelect = document.getElementById('aiModel');
@@ -862,6 +867,22 @@
                 })),
             ];
         }
+        function getGoogleMessages(settings) {
+            const contents = [];
+            if (settings.systemPrompt) {
+                contents.push({
+                    role: 'user',
+                    parts: [{ text: 'System instruction: ' + settings.systemPrompt }],
+                });
+            }
+            chatState.history.forEach(msg => {
+                contents.push({
+                    role: msg.role === 'assistant' ? 'model' : 'user',
+                    parts: [{ text: msg.content }],
+                });
+            });
+            return contents;
+        }
         async function callOpenAICompat(settings) {
             const response = await fetch(joinProviderUrl(settings.baseUrl, settings.chatPath || '/chat/completions', '/chat/completions'), {
                 method: 'POST',
@@ -908,6 +929,24 @@
             const data = await response.json();
             return data.content?.[0]?.text?.trim() || '';
         }
+        async function callGoogleCompat(settings) {
+            const response = await fetch(joinProviderUrl(settings.baseUrl, buildGoogleChatPath(settings.chatPath || '/models/{model}:generateContent', settings.model), '/models/{model}:generateContent'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...buildAuthHeaders(settings.authMode || 'x-api-key', settings.apiKey),
+                },
+                body: JSON.stringify({
+                    contents: getGoogleMessages(settings),
+                }),
+            });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error('Google Gemini API error: ' + response.status + ' ' + text);
+            }
+            const data = await response.json();
+            return data.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('').trim() || '';
+        }
         async function getAssistantReply() {
             const settings = loadAISettings();
             if (!settings.enabled || !settings.apiKey) {
@@ -915,6 +954,9 @@
             }
             if (location.protocol === 'file:') {
                 throw new Error('API calls do not work when opening the HTML file directly. Host it on GitHub Pages, Netlify, or another web server first.');
+            }
+            if (settings.format === 'google') {
+                return callGoogleCompat(settings);
             }
             if ((settings.provider === 'anthropic') || settings.format === 'anthropic') {
                 return callAnthropicCompat(settings);
