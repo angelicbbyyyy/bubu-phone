@@ -685,6 +685,10 @@
             const source = String(template || '/models/{model}:generateContent');
             return source.includes('{model}') ? source.replace('{model}', String(model || '').trim()) : source;
         }
+        function appendApiKeyQuery(url, apiKey) {
+            const separator = url.includes('?') ? '&' : '?';
+            return url + separator + 'key=' + encodeURIComponent(apiKey || '');
+        }
         function onAIProviderChange() {
             const provider = document.getElementById('aiProvider')?.value || 'openai';
             const baseUrlInput = document.getElementById('aiBaseUrl');
@@ -755,8 +759,10 @@
                     const data = await response.json();
                     models = (data.data || []).map(item => item.id).filter(Boolean);
                 } else {
-                    const response = await fetch(joinProviderUrl(baseUrl, provider === 'custom' ? modelsPath : '/models', '/models'), {
-                        headers: {
+                    const isGoogle = (document.getElementById('aiFormat')?.value || '') === 'google';
+                    const url = joinProviderUrl(baseUrl, provider === 'custom' ? modelsPath : '/models', '/models');
+                    const response = await fetch(isGoogle ? appendApiKeyQuery(url, apiKey) : url, {
+                        headers: isGoogle ? {} : {
                             ...buildAuthHeaders(provider === 'custom' ? authMode : 'bearer', apiKey),
                         },
                     });
@@ -930,14 +936,14 @@
             return data.content?.[0]?.text?.trim() || '';
         }
         async function callGoogleCompat(settings) {
-            const response = await fetch(joinProviderUrl(settings.baseUrl, buildGoogleChatPath(settings.chatPath || '/models/{model}:generateContent', settings.model), '/models/{model}:generateContent'), {
+            const response = await fetch(appendApiKeyQuery(joinProviderUrl(settings.baseUrl, buildGoogleChatPath(settings.chatPath || '/models/{model}:generateContent', settings.model), '/models/{model}:generateContent'), settings.apiKey), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...buildAuthHeaders(settings.authMode || 'x-api-key', settings.apiKey),
                 },
                 body: JSON.stringify({
-                    contents: getGoogleMessages(settings),
+                    systemInstruction: settings.systemPrompt ? { parts: [{ text: settings.systemPrompt }] } : undefined,
+                    contents: getGoogleMessages({ ...settings, systemPrompt: '' }),
                 }),
             });
             if (!response.ok) {
