@@ -430,6 +430,7 @@
                         <select id="aiProvider" class="settings-select" onchange="onAIProviderChange()">
                             <option value="openai">OpenAI-compatible</option>
                             <option value="anthropic">Anthropic</option>
+                            <option value="custom">Custom</option>
                         </select>
                     </div>
                     <div class="settings-row">
@@ -449,6 +450,38 @@
                     <div class="settings-row">
                         <div class="settings-row-title">API key</div>
                         <input id="aiApiKey" class="settings-input" type="password" placeholder="Paste your API key">
+                    </div>
+                    <div id="aiCustomFields" style="display:none;">
+                        <div class="settings-row">
+                            <div class="settings-row-title">Chat path</div>
+                            <input id="aiChatPath" class="settings-input" type="text" placeholder="/chat/completions">
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-title">Models path</div>
+                            <input id="aiModelsPath" class="settings-input" type="text" placeholder="/models">
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-title">Auth mode</div>
+                            <select id="aiAuthMode" class="settings-select">
+                                <option value="bearer">Bearer token</option>
+                                <option value="x-api-key">x-api-key</option>
+                                <option value="none">No auth header</option>
+                            </select>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-title">API format</div>
+                            <select id="aiFormat" class="settings-select">
+                                <option value="openai">OpenAI-compatible</option>
+                                <option value="anthropic">Anthropic</option>
+                            </select>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-title">Google AI shortcut</div>
+                            <div class="settings-inline-actions">
+                                <button class="settings-btn secondary" type="button" onclick="applyGoogleAIShortcut()">Use Google AI Studio</button>
+                            </div>
+                            <div class="settings-hint">Fills the custom fields for Google Generative Language API model listing. You may still need a proxy if the provider blocks browser CORS.</div>
+                        </div>
                     </div>
                 </div>
                 <div class="settings-section">
@@ -541,6 +574,10 @@
             baseUrl: 'https://api.openai.com/v1',
             apiKey: '',
             model: 'gpt-4o-mini',
+            chatPath: '/chat/completions',
+            modelsPath: '/models',
+            authMode: 'bearer',
+            format: 'openai',
             systemPrompt: 'You are Caleb texting Maria in a warm, natural, concise, affectionate way. Reply like a real text message, not an essay.',
         };
         const chatState = {
@@ -603,18 +640,74 @@
             const el = document.getElementById('aiSettingsStatus');
             if (el) el.textContent = text;
         }
+        function diagnoseAIError(err, context) {
+            const raw = String(err?.message || err || '');
+            const lower = raw.toLowerCase();
+            if (location.protocol === 'file:') {
+                return 'This page is opened as a local file, so browser API requests are blocked. Host it first, then try again.';
+            }
+            if (err instanceof TypeError || lower.includes('failed to fetch') || lower.includes('load failed') || lower.includes('networkerror')) {
+                return 'The browser could not reach the API. This is usually CORS, a blocked request, or a wrong base URL.';
+            }
+            if (lower.includes('401') || lower.includes('unauthorized') || lower.includes('invalid api key') || lower.includes('api key not valid')) {
+                return 'Authentication failed. The API key is missing, invalid, or using the wrong auth mode.';
+            }
+            if (lower.includes('403') || lower.includes('permission') || lower.includes('forbidden')) {
+                return 'The provider rejected access. Your key, project, or model may not have permission.';
+            }
+            if (lower.includes('404') || lower.includes('not found')) {
+                return 'The endpoint was not found. Check the base URL, chat path, or models path.';
+            }
+            if (lower.includes('400') || lower.includes('bad request') || lower.includes('invalid argument')) {
+                return 'The provider understood the request but rejected the format. This usually means the wrong API format, path, or payload shape.';
+            }
+            if (lower.includes('429') || lower.includes('rate limit') || lower.includes('quota')) {
+                return 'The request hit a rate limit or quota limit.';
+            }
+            if (context === 'models') {
+                return 'Model fetch failed. Most likely causes are a wrong models path, wrong auth mode, or a provider that does not allow browser requests.';
+            }
+            return 'The provider returned an unexpected error. Check the exact response details in the browser console.';
+        }
+        function buildAuthHeaders(authMode, apiKey) {
+            if (!apiKey || authMode === 'none') return {};
+            if (authMode === 'x-api-key') return { 'x-api-key': apiKey };
+            return { 'Authorization': 'Bearer ' + apiKey };
+        }
+        function joinProviderUrl(baseUrl, path, fallbackPath) {
+            const normalizedBase = String(baseUrl || '').replace(/\/$/, '');
+            const normalizedPath = String(path || fallbackPath || '').trim() || fallbackPath || '';
+            if (!normalizedPath) return normalizedBase;
+            return normalizedBase + (normalizedPath.startsWith('/') ? normalizedPath : '/' + normalizedPath);
+        }
         function onAIProviderChange() {
             const provider = document.getElementById('aiProvider')?.value || 'openai';
             const baseUrlInput = document.getElementById('aiBaseUrl');
             const modelInput = document.getElementById('aiModel');
+            const customFields = document.getElementById('aiCustomFields');
             if (!baseUrlInput || !modelInput) return;
+            if (customFields) customFields.style.display = provider === 'custom' ? '' : 'none';
             if (provider === 'anthropic') {
                 if (!baseUrlInput.value.trim() || baseUrlInput.value.includes('openai.com')) baseUrlInput.value = 'https://api.anthropic.com';
                 if (!modelInput.value.trim() || modelInput.value === 'gpt-4o-mini') setModelOptions(['claude-sonnet-4-6'], 'claude-sonnet-4-6');
             } else {
-                if (!baseUrlInput.value.trim() || baseUrlInput.value.includes('anthropic.com')) baseUrlInput.value = 'https://api.openai.com/v1';
-                if (!modelInput.value.trim() || modelInput.value === 'claude-sonnet-4-6') setModelOptions(['gpt-4o-mini'], 'gpt-4o-mini');
+                if (provider === 'openai') {
+                    if (!baseUrlInput.value.trim() || baseUrlInput.value.includes('anthropic.com')) baseUrlInput.value = 'https://api.openai.com/v1';
+                    if (!modelInput.value.trim() || modelInput.value === 'claude-sonnet-4-6') setModelOptions(['gpt-4o-mini'], 'gpt-4o-mini');
+                }
             }
+        }
+        function applyGoogleAIShortcut() {
+            document.getElementById('aiProvider').value = 'custom';
+            onAIProviderChange();
+            document.getElementById('aiBaseUrl').value = 'https://generativelanguage.googleapis.com';
+            document.getElementById('aiChatPath').value = '/v1beta/openai/chat/completions';
+            document.getElementById('aiModelsPath').value = '/v1beta/models';
+            document.getElementById('aiAuthMode').value = 'bearer';
+            document.getElementById('aiFormat').value = 'openai';
+            setModelOptions(['gemini-2.5-flash', 'gemini-2.5-pro'], 'gemini-2.5-flash');
+            const hint = document.getElementById('aiModelHint');
+            if (hint) hint.textContent = 'Google AI shortcut applied. Try Fetch Models to load available Gemini models.';
         }
         function setModelOptions(models, selectedValue) {
             const modelSelect = document.getElementById('aiModel');
@@ -631,6 +724,8 @@
             const provider = document.getElementById('aiProvider')?.value || 'openai';
             const baseUrl = document.getElementById('aiBaseUrl')?.value?.trim() || '';
             const apiKey = document.getElementById('aiApiKey')?.value?.trim() || '';
+            const modelsPath = document.getElementById('aiModelsPath')?.value?.trim() || '/models';
+            const authMode = document.getElementById('aiAuthMode')?.value || 'bearer';
             const hint = document.getElementById('aiModelHint');
             if (!baseUrl || !apiKey) {
                 if (hint) hint.textContent = 'Add both a base URL and API key first.';
@@ -644,7 +739,7 @@
             try {
                 let models = [];
                 if (provider === 'anthropic') {
-                    const response = await fetch(baseUrl.replace(/\/$/, '') + '/v1/models', {
+                    const response = await fetch(joinProviderUrl(baseUrl, '/v1/models', '/v1/models'), {
                         headers: {
                             'x-api-key': apiKey,
                             'anthropic-version': '2023-06-01',
@@ -655,14 +750,14 @@
                     const data = await response.json();
                     models = (data.data || []).map(item => item.id).filter(Boolean);
                 } else {
-                    const response = await fetch(baseUrl.replace(/\/$/, '') + '/models', {
+                    const response = await fetch(joinProviderUrl(baseUrl, provider === 'custom' ? modelsPath : '/models', '/models'), {
                         headers: {
-                            'Authorization': 'Bearer ' + apiKey,
+                            ...buildAuthHeaders(provider === 'custom' ? authMode : 'bearer', apiKey),
                         },
                     });
                     if (!response.ok) throw new Error('Failed to fetch models (' + response.status + ')');
                     const data = await response.json();
-                    models = (data.data || []).map(item => item.id).filter(Boolean);
+                    models = (data.data || data.models || []).map(item => item.id || item.name).filter(Boolean).map(name => String(name).replace(/^models\//, ''));
                 }
                 if (!models.length) throw new Error('No models were returned.');
                 models.sort();
@@ -670,7 +765,7 @@
                 if (hint) hint.textContent = 'Loaded ' + models.length + ' model' + (models.length === 1 ? '' : 's') + '.';
             } catch (err) {
                 console.error(err);
-                if (hint) hint.textContent = err.message || 'Could not fetch models.';
+                if (hint) hint.textContent = diagnoseAIError(err, 'models') + ' Details: ' + (err.message || 'Unknown error');
             }
         }
         function renderAISettingsForm() {
@@ -680,6 +775,10 @@
             const baseUrl = document.getElementById('aiBaseUrl');
             const model = document.getElementById('aiModel');
             const apiKey = document.getElementById('aiApiKey');
+            const chatPath = document.getElementById('aiChatPath');
+            const modelsPath = document.getElementById('aiModelsPath');
+            const authMode = document.getElementById('aiAuthMode');
+            const format = document.getElementById('aiFormat');
             const systemPrompt = document.getElementById('aiSystemPrompt');
             if (!enabled || !provider || !baseUrl || !model || !apiKey || !systemPrompt) return;
             enabled.checked = !!settings.enabled;
@@ -687,7 +786,12 @@
             baseUrl.value = settings.baseUrl || '';
             setModelOptions([settings.model || (provider.value === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-4o-mini')], settings.model || '');
             apiKey.value = settings.apiKey || '';
+            if (chatPath) chatPath.value = settings.chatPath || '/chat/completions';
+            if (modelsPath) modelsPath.value = settings.modelsPath || '/models';
+            if (authMode) authMode.value = settings.authMode || 'bearer';
+            if (format) format.value = settings.format || (provider.value === 'anthropic' ? 'anthropic' : 'openai');
             systemPrompt.value = settings.systemPrompt || '';
+            onAIProviderChange();
             setAIStatus(settings.enabled && settings.apiKey ? 'AI replies are enabled for this phone.' : 'AI is off. Chat will use the built-in reply mode.');
             const hint = document.getElementById('aiModelHint');
             if (hint) hint.textContent = 'Enter your base URL and API key, then fetch available models.';
@@ -710,6 +814,10 @@
                 baseUrl: document.getElementById('aiBaseUrl')?.value?.trim() || '',
                 apiKey: document.getElementById('aiApiKey')?.value?.trim() || '',
                 model: document.getElementById('aiModel')?.value?.trim() || '',
+                chatPath: document.getElementById('aiChatPath')?.value?.trim() || '/chat/completions',
+                modelsPath: document.getElementById('aiModelsPath')?.value?.trim() || '/models',
+                authMode: document.getElementById('aiAuthMode')?.value || 'bearer',
+                format: document.getElementById('aiFormat')?.value || 'openai',
                 systemPrompt: document.getElementById('aiSystemPrompt')?.value?.trim() || AI_DEFAULTS.systemPrompt,
             });
             setAIStatus(next.enabled && next.apiKey ? 'Saved. AI replies are enabled for this phone.' : 'Saved. AI is off or missing an API key.');
@@ -755,11 +863,11 @@
             ];
         }
         async function callOpenAICompat(settings) {
-            const response = await fetch(settings.baseUrl.replace(/\/$/, '') + '/chat/completions', {
+            const response = await fetch(joinProviderUrl(settings.baseUrl, settings.chatPath || '/chat/completions', '/chat/completions'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + settings.apiKey,
+                    ...buildAuthHeaders(settings.authMode || 'bearer', settings.apiKey),
                 },
                 body: JSON.stringify({
                     model: settings.model,
@@ -775,11 +883,11 @@
             return data.choices?.[0]?.message?.content?.trim() || '';
         }
         async function callAnthropicCompat(settings) {
-            const response = await fetch(settings.baseUrl.replace(/\/$/, '') + '/v1/messages', {
+            const response = await fetch(joinProviderUrl(settings.baseUrl, settings.chatPath || '/v1/messages', '/v1/messages'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-api-key': settings.apiKey,
+                    ...buildAuthHeaders(settings.authMode || 'x-api-key', settings.apiKey),
                     'anthropic-version': '2023-06-01',
                     'anthropic-dangerous-direct-browser-access': 'true',
                 },
@@ -808,7 +916,7 @@
             if (location.protocol === 'file:') {
                 throw new Error('API calls do not work when opening the HTML file directly. Host it on GitHub Pages, Netlify, or another web server first.');
             }
-            if (settings.provider === 'anthropic') {
+            if ((settings.provider === 'anthropic') || settings.format === 'anthropic') {
                 return callAnthropicCompat(settings);
             }
             return callOpenAICompat(settings);
@@ -827,9 +935,10 @@
                 appendChatMessage('assistant', finalReply);
             } catch (err) {
                 console.error(err);
-                const fallback = 'I could not reach the AI right now, so I am using the normal reply mode instead.';
+                const fallback = 'AI error: ' + diagnoseAIError(err, 'chat');
                 chatState.history.push({ role: 'assistant', content: fallback });
                 appendChatMessage('assistant', fallback);
+                setAIStatus(diagnoseAIError(err, 'chat') + ' Details: ' + (err.message || 'Unknown error'));
             }
         }
         let currentMoment = null;
