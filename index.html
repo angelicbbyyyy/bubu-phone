@@ -1,0 +1,550 @@
+```markdown
+## 🛑 核心指令 (System Override)
+当用户输入 **“打开手机”**、请**立即停止剧情描写**，并**严格按照下方模板**输出 HTML 代码块。
+
+## 🧠 AI 逻辑执行守则 (Logic Rules)
+**你必须在生成代码前，先进行以下逻辑判断：**
+1. **保持框架**：**绝对禁止**修改下方【标准代码模板】的 HTML 结构、CSS 布局（特别是马卡龙绿圆角边框和微信UI）、动画逻辑和 JS 代码。
+2. **执行替换**：将模板中形如 `{{变量名}}` 的双花括号变量，根据**当前剧情和角色设定**进行创作填充。
+
+## 3.‌ 剧情变量填充指南 (Context Generation)
+*   `{{CHAR_NAME}}`: 对方角色名。
+*   `{{USER_NAME}}`: 玩家/自己名字（如：梨花猫^）。
+*   `{{USER_WECHAT_ID}}`: 玩家微信号。
+*   `{{AVATAR_CHAR}}` / `{{AVATAR_USER}}`: 双方头像图片URL（请填入真实有效的图片链接）。
+*   `{{TIME}}` / `{{BATTERY}}` / `{{MUSIC_LYRIC}}`: 状态信息。
+*   `{{DIARY_ENTRIES}}`: **日记内容(HTML)**。含1篇长日记(`<div class="diary-card">...</div>`)和2个碎碎念(`<div class="sticky-note">...</div>`)。
+*   `{{CALL_SCENARIO}}` ("accept"或"reject") / `{{CALL_SCRIPT}}` (数组，如 `["喂？", "想你了"]`) / `{{CALL_LOG}}` (HTML)。
+*   `{{SEARCH_SUGGESTIONS}}`: 搜索建议(HTML)。
+*   `{{WECHAT_LIST_MSG}}` / `{{WECHAT_TIME}}` / `{{WECHAT_HISTORY}}` (HTML) / `{{MOMENTS_FEED}}` (HTML)。
+*   `{{BILL_DATE}}` / `{{BILL_TOTAL}}` / `{{INCOME_ROWS}}` / `{{EXPENSE_ROWS}}` / `{{BILL_SUMMARY}}`: 账单数据。
+
+---
+
+## 【标准代码模板】(Template Locked - 绝对禁止修改结构)
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kelivo OS v17</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-user-drag: none; }
+        
+        body { 
+            width: 100vw; height: 100vh; overflow: hidden; 
+            font-family: "Comic Sans MS", "YouYuan", "幼圆", "Microsoft YaHei", sans-serif; 
+            background: url('https://z.wiki/u/lZpFXM0Uj') center/cover; 
+            position: relative; overscroll-behavior: none; 
+            border-radius: 35px; 
+            transform: translateZ(0); 
+        }
+        
+        body::after {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            border: 8px solid #A8E6CF; border-radius: 35px; pointer-events: none; z-index: 999999; 
+        }
+        
+        .status-bar { position: absolute; top: 0; width: 100%; height: 32px; background: rgba(245,245,245,0.9); z-index: 900; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; font-size: 13px; font-weight: 600; font-family: -apple-system, sans-serif; }
+        .home-bar { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 140px; height: 6px; background: rgba(0,0,0,0.3); border-radius: 10px; z-index: 9999; cursor: pointer; pointer-events: auto !important; }
+        .app-back-btn { font-size: 20px; padding: 10px; color: #333; font-weight: bold; position: absolute; left: 5px; top: 5px; z-index: 99; cursor: pointer; }
+        
+        .music-widget { position: absolute; top: 50px; left: 50%; transform: translateX(-50%); width: 92%; aspect-ratio: 1181/537; background: url('https://z.wiki/u/RHtRLftOA') center/cover; border-radius: 20px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); display: flex; align-items: center; padding: 0 5%; z-index: 10; }
+        .vinyl-record { width: 38%; aspect-ratio: 1; background: url('https://z.wiki/u/KsyEWVosG') center/contain; border-radius: 50%; transition: transform 0.3s; }
+        .vinyl-record.playing { animation: spin 4s linear infinite; } @keyframes spin { 100% { transform: rotate(360deg); } }
+        .lyrics-box { flex: 1; height: 60%; margin-left: 15px; overflow: hidden; position: relative; color: #fff; font-size: 12px; mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent); -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent); opacity: 0; transition: opacity 0.5s; font-family: -apple-system, sans-serif; }
+        .lyrics-box.show { opacity: 1; } .lyrics-content { position: absolute; width: 100%; top: 100%; animation: scrollLyrics 10s linear infinite; } @keyframes scrollLyrics { 0% { top: 100%; } 100% { top: -150%; } }
+        
+        .desktop-container { position: absolute; top: 32%; left: 50%; transform: translateX(-50%); width: 92%; height: 400px; pointer-events: none; }
+        .icon-area { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: auto; }
+        .app-icon { position: absolute; width: 64px; height: 64px; border-radius: 14px; background-size: cover; box-shadow: 0 4px 10px rgba(0,0,0,0.1); z-index: 20; touch-action: none; transition: left 0.3s, top 0.3s, transform 0.1s; }
+        .app-icon.shaking { animation: shake 0.25s infinite ease-in-out; box-shadow: 0 0 0 2px rgba(255,255,255,0.5); z-index: 100; }
+        .app-icon.dragging { transition: none !important; transform: scale(1.15); z-index: 999; opacity: 0.9; }
+        @keyframes shake { 0%{transform:rotate(0deg);} 25%{transform:rotate(2deg);} 75%{transform:rotate(-2deg);} 100%{transform:rotate(0deg);} }
+        
+        .square-widget { position: absolute; right: 0; top: 0; width: 42%; aspect-ratio: 1; background: url('https://z.wiki/u/6X0SjCRab') center/cover; border-radius: 22px; margin-top: 3.2rem; pointer-events: auto; }
+        .photo-widget { position: absolute; left: 0; top: 211px; width: 42%; aspect-ratio: 1; background: url('https://z.wiki/u/mphXQlAkX') center/cover; border-radius: 22px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); pointer-events: auto; z-index: 10; transition: transform 0.1s; }
+        .photo-widget:active { transform: scale(0.95); }
+
+        #polaroid-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); z-index: 2000; display: none; flex-direction: column; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s; }
+        #polaroid-overlay.active { opacity: 1; }
+        .polaroid-img { width: 85%; height: auto; transform: translateY(120%) rotate(-5deg); opacity: 0; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.2)); cursor: pointer; }
+        @keyframes photoSlide { 0% { transform: translateY(120%) rotate(-5deg) scale(0.8); opacity: 0; } 100% { transform: translateY(-60px) rotate(0deg) scale(1); opacity: 1; } }
+        .polaroid-img.animate { animation: photoSlide 1.5s cubic-bezier(0.19, 1, 0.22, 1) forwards; }
+        #polaroid-text { color: rgba(255,255,255,0.95); font-size: 18px; margin-top: -30px; font-weight: 500; letter-spacing: 1px; text-align: center; width: 80%; text-shadow: 0 2px 4px rgba(0,0,0,0.5); opacity: 0; transform: translateY(20px); transition: all 0.8s ease 0.5s; font-family: 'ZCOOL KuaiLe', cursive; }
+        #polaroid-text.show { opacity: 1; transform: translateY(0); }
+
+        #diary-app { background-color: #fdfbf7 !important; z-index: 2050; font-family: "Comic Sans MS", "YouYuan", sans-serif; position: relative; }
+        #diary-bg-texture { position: absolute; inset: 0; background: url('https://www.transparenttextures.com/patterns/paper.png') repeat; background-size: 300px; opacity: 0.15; mix-blend-mode: multiply; pointer-events: none; z-index: 0; }
+        .diary-header { height: 60px; display: flex; align-items: center; padding: 0 20px; font-size: 20px; font-weight: bold; color: #798d7b; border-bottom: 1px solid rgba(0,0,0,0.05); position: sticky; top: 0; background: rgba(253,251,247,0.95); z-index: 10; font-family: 'ZCOOL KuaiLe', cursive; }
+        .diary-back { font-size: 24px; margin-right: 15px; cursor: pointer; color: #a3bfa5; }
+        .diary-container { padding: 25px 20px; overflow-y: auto; padding-bottom: 80px; height: calc(100% - 60px); position: relative; z-index: 1; }
+        .sticky-note { background: #fffbf0; padding: 20px; margin-bottom: 30px; position: relative; width: 90%; margin-left: auto; margin-right: auto; border: 1px solid rgba(139, 69, 19, 0.2); border-radius: 2px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }
+        .note-text { font-family: 'ZCOOL KuaiLe', cursive; font-size: 22px; color: #798d7b; line-height: 1.5; text-shadow: 1px 1px 2px rgba(195, 237, 200, 0.4); }
+        .tape-deco { position: absolute; top: -12px; left: 50%; transform: translateX(-50%) rotate(-1deg); width: 100px; height: 28px; background: rgba(195, 237, 200, 0.7); background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.3) 0, rgba(255,255,255,0.3) 2px, transparent 2px, transparent 8px); box-shadow: 0 1px 2px rgba(0,0,0,0.1); z-index: 5; opacity: 0.9; }
+        .diary-card { background: #fff; padding: 30px 20px; margin-bottom: 35px; position: relative; transform: rotate(-0.5deg); border-radius: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); background: linear-gradient(to left bottom, transparent 50%, rgba(0,0,0,.05) 0) no-repeat 100% 100% / 30px 30px, linear-gradient(-135deg, transparent 20px, #fff 0); }
+        .cat-whisker-deco { position: absolute; bottom: 15px; right: 40px; width: 40px; height: 30px; opacity: 0.8; }
+        .cat-dot { width: 6px; height: 6px; background: #c3edc8; border-radius: 50%; position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+        .cat-line { height: 1px; background: #fff; position: absolute; right: 6px; border-radius: 1px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
+        .d-header { margin-bottom: 15px; border-bottom: 2px dashed #c3edc8; padding-bottom: 10px; }
+        .d-date { font-size: 18px; color: #a3bfa5; font-weight: bold; font-family: 'ZCOOL KuaiLe', cursive; }
+        .d-body { font-size: 17px; line-height: 1.9; color: #555; font-family: 'ZCOOL KuaiLe', cursive; letter-spacing: 0.5px; }
+
+        .dock { position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); width: 92%; height: 95px; background: rgba(255,255,255,0.45); backdrop-filter: blur(20px); border-radius: 32px; display: flex; justify-content: space-evenly; align-items: center; border: 1px solid rgba(255,255,255,0.3); z-index: 20; pointer-events: auto; }
+        .dock-icon { width: 58px; height: 58px; background-size: cover; border-radius: 12px; }
+        .app-window { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 950; display: none; flex-direction: column; pointer-events: auto; animation: openApp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); font-family: -apple-system, sans-serif; }
+        @keyframes openApp { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        #wechat, #browser, #phone-app, #bill, #music-app { font-family: -apple-system, "Microsoft YaHei", sans-serif; }
+        #diary-app { font-family: 'ZCOOL KuaiLe', cursive; }
+        
+        #phone-app { background: linear-gradient(to bottom, #e8f4f8, #ffffff); }
+        .ph-top-bar { height: 50px; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; border-bottom: 1px solid rgba(0,0,0,0.05); background: rgba(255,255,255,0.8); backdrop-filter: blur(10px); z-index: 10; }
+        .ph-back { font-size: 24px; color: #4CAF50; cursor: pointer; }
+        .ph-title { font-size: 16px; font-weight: bold; color: #333; }
+        .ph-more { font-size: 20px; color: #333; }
+        .ph-tabs { height: 70px; background: #fff; border-top: 1px solid #eee; display: flex; position: absolute; bottom: 0; width: 100%; z-index: 10; padding-bottom: 15px; }
+        .ph-tab { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #999; flex-direction: column; gap: 4px; cursor: pointer; }
+        .ph-tab.active { color: #4CAF50; font-weight: bold; }
+        .ph-tab-icon { font-size: 20px; margin-bottom: 2px; }
+        .ph-content { position: absolute; top: 50px; bottom: 70px; width: 100%; overflow: hidden; }
+        .ph-pane { width: 100%; height: 100%; display: none; flex-direction: column; opacity: 0; transition: opacity 0.2s ease; overflow-y: auto; }
+        .ph-pane.active { display: flex; opacity: 1; }
+        .dial-display { height: 15%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #dial-number { font-size: 32px; font-weight: bold; color: #333; letter-spacing: 1px; min-height: 40px; }
+        #dial-status { font-size: 12px; color: #4CAF50; height: 16px; opacity: 0; }
+        .dial-panel-wrapper { flex: 1; background: rgba(255,255,255,0.6); backdrop-filter: blur(10px); margin: 0 15px 15px 15px; border-radius: 25px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); border: 1px solid rgba(255,255,255,0.8); display: flex; flex-direction: column; justify-content: space-evenly; padding: 20px 0; }
+        .dial-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px 20px; padding: 0 40px; }
+        .dial-key { width: 60px; height: 60px; background: #fff; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.1s; }
+        .dial-key:active { transform: scale(0.9); background: #f0f0f0; }
+        .key-num { font-size: 22px; font-weight: 500; color: #333; }
+        .key-sub { font-size: 9px; color: #999; margin-top: -2px; }
+        .dial-actions { display: flex; justify-content: space-between; align-items: center; padding: 0 50px; }
+        .action-btn { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.2); cursor: pointer; }
+        .btn-call { background: #4CAF50; } .btn-hangup { background: #F44336; display: none; }
+        .btn-del { background: transparent; color: #ccc; box-shadow: none; font-size: 28px; }
+        .call-log-item, .contact-item { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #eee; }
+        .log-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 15px; font-size: 18px; }
+        .log-icon.missed { background: #FFEBEE; color: #F44336; } .log-icon.out { background: #E8F5E9; color: #4CAF50; }
+        .contact-avatar { width: 45px; height: 45px; border-radius: 50%; background-size: cover; margin-right: 15px; background-color: #ddd; }
+        .item-info { flex: 1; }
+        .item-title { font-size: 16px; color: #333; margin-bottom: 4px; }
+        .item-sub { font-size: 12px; color: #999; }
+        
+        #incall-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 999; display: none; flex-direction: column; align-items: center; padding-top: 100px; animation: fadeIn 0.5s ease; overflow: hidden; }
+        .incall-avatar { width: 120px; height: 120px; border-radius: 50%; background-image: url('{{AVATAR_CHAR}}'); background-size: cover; box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin-bottom: 20px; z-index: 2; }
+        .incall-name { font-size: 24px; font-weight: bold; color: #333; margin-bottom: 5px; z-index: 2; }
+        .incall-number { font-size: 14px; color: #999; margin-bottom: 20px; letter-spacing: 1px; z-index: 2; }
+        .incall-timer { font-size: 16px; color: #333; font-variant-numeric: tabular-nums; margin-bottom: 60px; z-index: 2; }
+        .incall-caption { width: 85%; text-align: center; font-size: 18px; color: #333; font-weight: 500; min-height: 50px; margin-bottom: 50px; opacity: 0; transition: opacity 0.3s; background: #CAE6F0; padding: 15px 20px; border-radius: 16px; z-index: 2; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .incall-caption.show { opacity: 1; }
+        .incall-btn-area { position: absolute; bottom: 80px; width: 100%; display: flex; justify-content: center; z-index: 2; }
+        .btn-end-call { width: 70px; height: 70px; background: #F44336; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 30px; box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4); cursor: pointer; transition: transform 0.1s; }
+        .btn-end-call:active { transform: scale(0.9); }
+        .snowflake { position: absolute; top: -20px; color: #AEE1F9; font-size: 20px; user-select: none; pointer-events: none; animation: fall linear forwards; z-index: 1; opacity: 0.8; text-shadow: 0 0 5px rgba(255,255,255,0.8); }
+        @keyframes fall { to { transform: translateY(105vh); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        #browser { background: #f9f9f9; }
+        .br-home { display: flex; flex-direction: column; align-items: center; padding: 40px 20px; height: 100%; overflow-y: auto; }
+        .br-logo { font-size: 36px; font-weight: bold; color: #4285F4; margin-bottom: 30px; }
+        .br-search-box { width: 100%; height: 44px; background: #fff; border-radius: 22px; display: flex; align-items: center; padding: 0 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #eee; font-size: 14px; color: #333; margin-bottom: 20px; cursor: pointer; }
+        .br-search-icon { margin-right: 10px; color: #999; }
+        .br-shortcuts { display: flex; gap: 30px; margin-top: 10px; }
+        .br-shortcut { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12px; color: #666; cursor: pointer; }
+        .br-s-icon { width: 45px; height: 45px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .br-page { position: absolute; top: 0; left: 0; width: 100%; bottom: 45px; background: #fff; display: none; flex-direction: column; z-index: 10; }
+        .br-page.active { display: flex; }
+        .br-header { height: 50px; border-bottom: 1px solid #eee; display: flex; align-items: center; padding: 0 15px; justify-content: space-between; background: #fff; }
+        .br-url { background: #f0f2f5; padding: 5px 12px; border-radius: 12px; font-size: 12px; color: #333; flex: 1; text-align: center; margin: 0 15px; }
+        .br-body { flex: 1; padding: 20px; overflow-y: auto; color: #444; line-height: 1.6; font-size: 15px; }
+        .br-list-item { padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 10px; }
+        .br-list-item:active { background: #f9f9f9; }
+        .br-bar { position: absolute; bottom: 0; width: 100%; height: 45px; background: #f9f9f9; border-top: 1px solid #dcdcdc; display: flex; justify-content: space-around; align-items: center; font-size: 20px; color: #5f6368; z-index: 20; }
+        .br-btn:active { color: #4285F4; }
+        .search-suggestions { display: none; width: 100%; background: #fff; border-radius: 10px; margin-top: 10px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .search-row { padding: 10px; border-bottom: 1px solid #f5f5f5; font-size: 14px; color: #555; }
+        .search-row:last-child { border: none; }
+
+        #wechat { background: #fff; }
+        .wx-top-bar { height: 50px; background: #ededed; border-bottom: 1px solid #dcdcdc; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; position: absolute; top: 0; width: 100%; z-index: 10; font-weight: bold; }
+        .wx-nav { height: 85px; background: #f7f7f7; border-top: 1px solid #dcdcdc; display: flex; justify-content: space-around; align-items: flex-start; padding-top: 12px; font-size: 12px; position: absolute; bottom: 0; width: 100%; z-index: 10; }
+        .wx-tab { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #999; }
+        .wx-tab.active { color: #07C160; }
+        .wx-tab-icon { font-size: 26px; } 
+        .wx-page { position: absolute; top: 50px; bottom: 85px; width: 100%; overflow-y: auto; display: none; background: #fff; }
+        .wx-page.active { display: block; }
+        .wx-list-item { display: flex; align-items: center; padding: 12px 15px; border-bottom: 1px solid #f0f0f0; width: 100%; }
+        .wx-list-item:active { background: #f5f5f5; }
+        .wx-avatar { width: 48px; height: 48px; border-radius: 6px; background-size: cover; margin-right: 12px; flex-shrink: 0; }
+        .wx-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .wx-row-top { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 4px; }
+        .wx-name { font-size: 16px; color: #000; font-weight: 500; }
+        .wx-time { font-size: 12px; color: #b2b2b2; }
+        .wx-last-msg { font-size: 13px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .wx-group { margin-top: 10px; border-top: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0; }
+        .discover-item { display: flex; align-items: center; padding: 12px 15px; background: #fff; border-bottom: 1px solid #f0f0f0; }
+        .discover-item:last-child { border-bottom: none; }
+        .discover-item:active { background: #f5f5f5; }
+        .discover-icon { width: 22px; height: 22px; margin-right: 15px; }
+        .discover-text { flex: 1; font-size: 16px; color: #000; }
+        .discover-arrow { color: #ccc; font-size: 18px; }
+        
+        .me-header { display: flex; padding: 40px 20px 30px 20px; background: #fff; align-items: center; }
+        .me-avatar { width: 64px; height: 64px; border-radius: 8px; background-size: cover; margin-right: 15px; }
+        .me-info { flex: 1; }
+        .me-name { font-size: 20px; font-weight: bold; color: #333; margin-bottom: 5px; }
+        .me-id { font-size: 14px; color: #999; }
+        .me-status { display: inline-block; border: 1px solid #ddd; border-radius: 12px; padding: 2px 8px; font-size: 12px; color: #666; margin-top: 5px; }
+        .me-qr { width: 20px; height: 20px; opacity: 0.5; font-size: 20px; line-height: 20px; }
+        .wx-cell { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #f5f5f5; background: #fff; }
+        .wx-cell:last-child { border-bottom: none; }
+        .wx-cell:active { background: #f0f0f0; }
+        .wx-cell-icon { width: 24px; height: 24px; margin-right: 15px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .wx-cell-text { flex: 1; font-size: 16px; color: #333; }
+        .wx-cell-arrow { color: #ccc; font-size: 16px; }
+
+        #wx-moments-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 20; display: none; overflow-y: auto; flex-direction: column; animation: slideInRight .3s ease; }
+        .moments-header { position: relative; width: 100%; height: 320px; margin-bottom: 40px; }
+        .moments-bg { width: 100%; height: 100%; object-fit: cover; }
+        .moments-user-row { position: absolute; bottom: -20px; right: 20px; display: flex; align-items: flex-start; gap: 20px; }
+        .moments-nickname { color: #fff; font-weight: bold; font-size: 18px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); margin-top: 15px; }
+        .moments-avatar { width: 70px; height: 70px; border-radius: 8px; border: 2px solid #fff; background-size: cover; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .moment-item { padding: 15px 20px; border-bottom: 1px solid #f0f0f0; display: flex; gap: 10px; }
+        .m-avatar { width: 40px; height: 40px; border-radius: 6px; background-size: cover; flex-shrink: 0; }
+        .m-content { flex: 1; }
+        .m-name { color:#576b95; font-weight: bold; font-size: 15px; margin-bottom: 6px; }
+        .m-text { font-size: 15px; color: #000; line-height: 1.5; margin-bottom: 8px; }
+        .m-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; position: relative; }
+        .m-time { font-size: 12px; color: #999; }
+        .m-action-btn { background: #f7f7f7; color: #576b95; width: 32px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; position: relative; }
+        .m-popover { position: absolute; right: 40px; top: -10px; height: 40px; background: #4c4c4c; border-radius: 4px; display: none; align-items: center; color: #fff; font-size: 14px; padding: 0 10px; white-space: nowrap; animation: popIn .2s; }
+        .m-popover.show { display: flex; }
+        .m-pop-item { padding: 0 15px; display: flex; align-items: center; gap: 5px; }
+        .m-line { width: 1px; height: 20px; background: #333; }
+        .m-comments-area { background: #f7f7f7; border-radius: 4px; margin-top: 10px; font-size: 14px; padding: 5px 10px; }
+        .m-likes-list { color: #576b95; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 5px; font-size: 13px; font-weight: bold; }
+        .m-comment-row { color: #000; margin-bottom: 3px; line-height: 1.4; }
+        .m-user { color: #576b95; font-weight: bold; }
+        .m-input-bar { position: absolute; bottom: 0; width: 100%; background: #f7f7f7; padding: 10px; display: none; align-items: center; border-top: 1px solid #ddd; z-index: 999; padding-bottom: 35px; }
+        .m-input-bar.show { display: flex; }
+        #wx-chat-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #f2f2f2; z-index: 20; display: none; flex-direction: column; animation: slideInRight .3s ease; }
+        .chat-area { flex: 1; overflow-y: auto; padding: 60px 15px; padding-bottom: 100px; background: url('https://z.wiki/u/CVcXpJmuP') center/cover fixed; }
+        .msg-row { display: flex; margin-bottom: 15px; }
+        .msg-row.self { flex-direction: row-reverse; }
+        .chat-avatar { width: 40px; height: 40px; border-radius: 6px; margin: 0 10px; background-size: cover; }
+        .bubble { max-width: 70%; padding: 10px 14px; border-radius: 8px; font-size: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .msg-row.other .bubble { background: linear-gradient(135deg, #FDF0EC, #AEE1F9); }
+        .msg-row.self .bubble { background: linear-gradient(135deg, #DBEAF8, #FCDCDA); }
+        .chat-input-bar { min-height: 50px; background: #f7f7f7; border-top: 1px solid #dcdcdc; display: flex; align-items: center; padding: 8px 10px; position: absolute; bottom: 0; width: 100%; padding-bottom: 35px; }
+        .chat-input { flex: 1; height: 36px; border: none; background: #fff; border-radius: 4px; padding: 0 10px; margin: 0 8px; }
+        .chat-timestamp { text-align: center; font-size: 12px; color: #b2b2b2; margin: 20px 0 10px 0; }
+        .chat-system-msg { text-align: center; margin: 15px 0; font-size: 12px; color: #b2b2b2; }
+        #bill { background: #F5F7FA; overflow-y: auto; padding-top: 50px; }
+        .bill-card { background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+        .bill-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #f0f0f0; font-size: 15px; }
+        .bill-row:last-child { border-bottom: none; }
+        .income-val { color: #07C160; font-weight: 500; }
+        .expense-val { color: #FF5252; font-weight: 500; }
+        #music-app { background: #222; color: #fff; display:none; flex-direction:column;align-items:center; justify-content:center; }
+        .music-disc { width: 250px; height: 250px; border-radius: 50%; background: url('https://z.wiki/u/KsyEWVosG') center/cover; animation: spin 8s linear infinite; box-shadow: 0 0 30px rgba(255,255,255,0.1); margin-bottom: 40px; }
+        .music-title { font-size: 24px; margin-bottom: 10px; font-weight: bold; }
+        .music-artist { font-size: 16px; color: #aaa; margin-bottom: 50px; }
+        .music-controls { display: flex; gap: 40px; align-items: center; }
+        .m-btn { font-size: 30px; cursor: pointer; }
+        .m-play { font-size: 50px; }
+        #tiktok { background: #000; }
+        @keyframes popIn { from{opacity:0;transform:scale(0.8);} to{opacity:1;transform:scale(1);} }
+    </style>
+</head>
+<body onclick="exitEditMode(event)">
+
+    <div class="status-bar">
+        <span id="clock">{{TIME}}</span>
+        <div style="display:flex; gap:6px;"><span>5G</span> <span>{{BATTERY}}</span></div>
+    </div>
+
+    <div class="music-widget">
+        <div class="vinyl-record" id="record" onclick="toggleMusic(event)"></div>
+        <div class="lyrics-box" id="lyricsBox"><div class="lyrics-content">♪ {{MUSIC_LYRIC}}</div></div>
+    </div>
+    <div class="desktop-container">
+        <div class="icon-area">
+            <div class="app-icon" data-idx="0" style="background-image: url('https://z.wiki/u/gcD1iY9LK')" onclick="handleClick('wechat')"></div>
+            <div class="app-icon" data-idx="1" style="background-image: url('https://z.wiki/u/2UaBLMLaG')" onclick="handleClick('bill')"></div>
+            <div class="app-icon" data-idx="2" style="background-image: url('https://z.wiki/u/iT1x92rbN')" onclick="handleClick('tiktok')"></div>
+            <div class="app-icon" data-idx="3" style="background-image: url('https://z.wiki/u/R3PFm7dix')" onclick="openApp('music-app')"></div>
+        </div>
+        <div class="square-widget"></div>
+        <div class="photo-widget" onclick="openPolaroid()"></div>
+    </div>
+    <div class="dock">
+        <div class="dock-icon" style="background-image: url('https://z.wiki/u/mT7L7GIF8')"></div>
+        <div class="dock-icon" style="background-image: url('https://z.wiki/u/TvVcMpr6G')" onclick="openApp('phone-app')"></div>
+        <div class="dock-icon" style="background-image: url('https://z.wiki/u/kbVFbBpFD')" onclick="openApp('browser')"></div>
+    </div>
+
+    <div id="polaroid-overlay" onclick="closePolaroid(event)">
+        <img src="https://picsum.photos/seed/polaroid/600/800" class="polaroid-img" id="polaroid-img" onclick="openDiary(event)">
+        <div id="polaroid-text"></div>
+    </div>
+
+    <div id="diary-app" class="app-window">
+        <div id="diary-bg-texture"></div>
+        <div class="diary-header">
+            <span class="diary-back" onclick="closeDiary()">❮</span>
+            <span>{{CHAR_NAME}}'s Diary</span>
+        </div>
+        <div class="diary-container">
+            {{DIARY_ENTRIES}}
+        </div>
+    </div>
+
+    <div id="browser" class="app-window">
+        <div class="br-home" id="br-home">
+            <div class="br-logo">Kelivo</div>
+            <div class="br-search-box" onclick="toggleSearch(true)">
+                <span class="br-search-icon">🔍</span> 搜索或输入网址
+            </div>
+            <div class="search-suggestions" id="search-suggestions">
+                {{SEARCH_SUGGESTIONS}}
+            </div>
+            <div class="br-shortcuts">
+                <div class="br-shortcut" onclick="showBrPage('favorites')"><div class="br-s-icon">⭐</div>收藏</div>
+                <div class="br-shortcut" onclick="showBrPage('history')"><div class="br-s-icon">🕒</div>历史</div>
+            </div>
+        </div>
+        <div class="br-page" id="br-content-page">
+            <div class="br-header"><span onclick="closeBrPage()">✕</span><div class="br-url" id="br-url-bar">kelivo.com</div><span>⋮</span></div>
+            <div class="br-body" id="br-body-content"></div>
+        </div>
+        <div class="br-page" id="br-list-page">
+            <div class="br-header"><span onclick="closeBrPage()">✕</span><div class="br-url" id="br-list-title">列表</div><span></span></div>
+            <div class="br-body" id="br-list-body"></div>
+        </div>
+        <div class="br-bar"><div class="br-btn" onclick="closeBrPage()">❮</div><div class="br-btn">❯</div><div class="br-btn">↻</div><div class="br-btn">🏠</div><div class="br-btn">📑</div></div>
+        <div id="data-history" style="display:none"><div class="br-list-item"><span>🕒</span><span>如何养猫</span></div></div>
+        <div id="data-favorites" style="display:none"><div class="br-list-item"><span>⭐</span><span>Kelivo OS 官网</span></div></div>
+    </div>
+
+    <div id="phone-app" class="app-window">
+        <div id="incall-overlay">
+            <div class="incall-avatar"></div><div class="incall-name">{{CHAR_NAME}}</div><div class="incall-number">138-0013-8000</div><div class="incall-timer" id="call-timer">00:00</div>
+            <div class="incall-caption" id="call-caption">...</div>
+            <div class="incall-btn-area"><div class="btn-end-call" onclick="endCall()">❌</div></div>
+        </div>
+        <div class="ph-top-bar"><div class="ph-back" onclick="closeAll()">←</div><div class="ph-title">电话</div><div class="ph-more">⋮</div></div>
+        <div class="ph-content">
+            <div id="pane-dial" class="ph-pane active">
+                <div class="dial-display"><div id="dial-number"></div><div id="dial-status"></div></div>
+                <div class="dial-panel-wrapper">
+                    <div class="dial-pad">
+                        <div class="dial-key" onclick="dial(1)"><div class="key-num">1</div></div><div class="dial-key" onclick="dial(2)"><div class="key-num">2</div><div class="key-sub">ABC</div></div><div class="dial-key" onclick="dial(3)"><div class="key-num">3</div><div class="key-sub">DEF</div></div>
+                        <div class="dial-key" onclick="dial(4)"><div class="key-num">4</div><div class="key-sub">GHI</div></div><div class="dial-key" onclick="dial(5)"><div class="key-num">5</div><div class="key-sub">JKL</div></div><div class="dial-key" onclick="dial(6)"><div class="key-num">6</div><div class="key-sub">MNO</div></div>
+                        <div class="dial-key" onclick="dial(7)"><div class="key-num">7</div><div class="key-sub">PQRS</div></div><div class="dial-key" onclick="dial(8)"><div class="key-num">8</div><div class="key-sub">TUV</div></div><div class="dial-key" onclick="dial(9)"><div class="key-num">9</div><div class="key-sub">WXYZ</div></div>
+                        <div class="dial-key" onclick="dial('*')"><div class="key-num">*</div></div><div class="dial-key" onclick="dial(0)"><div class="key-num">0</div><div class="key-sub">+</div></div><div class="dial-key" onclick="dial('#')"><div class="key-num">#</div></div>
+                    </div>
+                    <div class="dial-actions"><div class="action-btn btn-del" onclick="delNum()">⌫</div><div class="action-btn btn-call" id="call-btn" onclick="makeCall()">📞</div><div class="action-btn btn-hangup" id="hang-btn" onclick="hangUp()">❌</div></div>
+                </div>
+            </div>
+            <div id="pane-log" class="ph-pane">{{CALL_LOG}}</div>
+            <div id="pane-contact" class="ph-pane"><div class="contact-item" onclick="quickDial('138xxxx')"><div class="contact-avatar" style="background-image: url('{{AVATAR_CHAR}}')"></div><div class="item-info"><div class="item-title">{{CHAR_NAME}}</div><div class="item-sub">138-xxxx-xxxx</div></div></div></div>
+        </div>
+        <div class="ph-tabs"><div class="ph-tab active" onclick="switchPhoneTab(0)"><span class="ph-tab-icon">🔢</span>拨号</div><div class="ph-tab" onclick="switchPhoneTab(1)"><span class="ph-tab-icon">🕒</span>记录</div><div class="ph-tab" onclick="switchPhoneTab(2)"><span class="ph-tab-icon">📒</span>通讯录</div></div>
+    </div>
+
+    <div id="wechat" class="app-window">
+        <div class="wx-top-bar" id="wx-main-title"><span>微信(1)</span><span>+</span></div>
+        
+        <div id="tab-chat" class="wx-page active"><div class="wx-list-item" onclick="openChat()"><div class="wx-avatar" style="background-image: url('{{AVATAR_CHAR}}')"></div><div class="wx-info"><div class="wx-row-top"><span class="wx-name">{{CHAR_NAME}}</span><span class="wx-time">{{WECHAT_TIME}}</span></div><div class="wx-last-msg">{{WECHAT_LIST_MSG}}</div></div></div></div>
+        
+        <div id="tab-contact" class="wx-page" style="background:#fff;">
+            <div class="wx-group" style="margin-top:0;">
+                <div class="wx-cell"><div class="wx-cell-icon" style="background:#FA9D3B;color:#fff;border-radius:4px;width:36px;height:36px;">👤</div><div class="wx-cell-text">新的朋友</div></div>
+                <div class="wx-cell"><div class="wx-cell-icon" style="background:#07C160;color:#fff;border-radius:4px;width:36px;height:36px;">👥</div><div class="wx-cell-text">群聊</div></div>
+                <div class="wx-cell"><div class="wx-cell-icon" style="background:#2782D7;color:#fff;border-radius:4px;width:36px;height:36px;">🏷️</div><div class="wx-cell-text">标签</div></div>
+            </div>
+            <div style="padding:5px 15px; background:#f7f7f7; color:#999; font-size:12px;">星标朋友</div>
+            <div class="wx-list-item" onclick="openChat()">
+                <div class="wx-avatar" style="background-image: url('{{AVATAR_CHAR}}')"></div>
+                <div class="wx-info"><div class="wx-name">{{CHAR_NAME}}</div></div>
+            </div>
+        </div>
+
+        <div id="tab-discover" class="wx-page" style="background:#f7f7f7;">
+            <div class="wx-group"><div class="discover-item" onclick="openMoments()"><img src="https://z.wiki/u/gcD1iY9LK" style="width:22px;height:22px;margin-right:15px"><span class="discover-text">朋友圈</span><span class="discover-arrow">›</span></div></div>
+            <div class="wx-group"><div class="discover-item"><img src="https://z.wiki/u/iT1x92rbN" style="width:22px;height:22px;margin-right:15px"><span class="discover-text">视频号</span><span class="discover-arrow">›</span></div></div>
+        </div>
+
+        <div id="tab-me" class="wx-page" style="background:#f7f7f7;">
+            <div class="me-header">
+                <div class="me-avatar" style="background-image: url('{{AVATAR_USER}}')"></div>
+                <div class="me-info">
+                    <div class="me-name">{{USER_NAME}}</div>
+                    <div class="me-id">微信号：{{USER_WECHAT_ID}}</div>
+                    <div class="me-status">+ 状态</div>
+                </div>
+                <div class="me-qr">⚃</div>
+                <div class="wx-cell-arrow" style="margin-left:10px;">›</div>
+            </div>
+            <div class="wx-group">
+                <div class="wx-cell"><div class="wx-cell-icon">🟢</div><div class="wx-cell-text">服务</div><div class="wx-cell-arrow">›</div></div>
+            </div>
+            <div class="wx-group">
+                <div class="wx-cell"><div class="wx-cell-icon">📦</div><div class="wx-cell-text">收藏</div><div class="wx-cell-arrow">›</div></div>
+                <div class="wx-cell" onclick="openMoments()"><div class="wx-cell-icon">🖼️</div><div class="wx-cell-text">朋友圈</div><div class="wx-cell-arrow">›</div></div>
+                <div class="wx-cell"><div class="wx-cell-icon">🎦</div><div class="wx-cell-text">视频号与公众号</div><div class="wx-cell-arrow">›</div></div>
+                <div class="wx-cell"><div class="wx-cell-icon">🛍️</div><div class="wx-cell-text">小店与卡包</div><div class="wx-cell-arrow">›</div></div>
+                <div class="wx-cell"><div class="wx-cell-icon">😊</div><div class="wx-cell-text">表情</div><div class="wx-cell-arrow">›</div></div>
+            </div>
+            <div class="wx-group">
+                <div class="wx-cell"><div class="wx-cell-icon">⚙️</div><div class="wx-cell-text">设置</div><div class="wx-cell-arrow">›</div></div>
+            </div>
+        </div>
+
+        <div class="wx-nav">
+            <div class="wx-tab active" onclick="switchTab('chat', this)"><span class="wx-tab-icon">💬</span>微信</div>
+            <div class="wx-tab" onclick="switchTab('contact', this)"><span class="wx-tab-icon">📒</span>通讯录</div>
+            <div class="wx-tab" onclick="switchTab('discover', this)"><span class="wx-tab-icon">🧭</span>发现</div>
+            <div class="wx-tab" onclick="switchTab('me', this)"><span class="wx-tab-icon">👤</span>我</div>
+        </div>
+
+        <div id="wx-moments-view"><div style="position:absolute; top:0; left:0; width:100%; height:60px; z-index:99; display:flex; align-items:center; padding:0 15px;"><div onclick="closeMoments()" style="width:30px; height:30px; background:rgba(0,0,0,0.3); border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff;">❮</div></div><div class="moments-header"><img src="https://z.wiki/u/TaJOhDla7" class="moments-bg"><div class="moments-user-row"><span class="moments-nickname">{{USER_NAME}}</span><div class="moments-avatar" style="background-image: url('{{AVATAR_USER}}')"></div></div></div><div id="moments-feed" style="padding-bottom:50px;">{{MOMENTS_FEED}}</div><div class="m-input-bar" id="m-input-bar"><input type="text" class="chat-input" id="m-input" placeholder="评论..."><button onclick="submitComment()" style="background:#07C160; color:#fff; border:none; padding:6px 12px; border-radius:4px;">发送</button></div></div>
+        
+        <div id="wx-chat-view"><div class="wx-top-bar"><span onclick="closeChat()">❮ {{CHAR_NAME}}</span><span>•••</span></div><div class="chat-area" id="chat-box">{{WECHAT_HISTORY}}</div><div class="chat-input-bar"><input type="text" class="chat-input" id="wx-input"><button onclick="sendMsg()" style="background:#07C160; color:#fff; border:none; padding:6px 12px; border-radius:4px;">发送</button></div></div>
+    </div>
+
+    <div id="bill" class="app-window"><div class="app-back-btn" onclick="closeAll()">❮</div><div style="padding:20px; padding-bottom:80px;"><div style="text-align:center; margin-bottom:15px; color:#666; font-size:14px;">📊 收支清单 ({{BILL_DATE}})</div><div style="text-align:center; margin-bottom:25px;"><div style="color:#888; font-size:12px;">当前总资产</div><div style="font-size:36px; font-weight:bold; color:#333;">{{BILL_TOTAL}}</div></div><div class="bill-card"><div style="color:#999; font-weight:bold; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;">📥 收入</div>{{INCOME_ROWS}}</div><div class="bill-card"><div style="color:#999; font-weight:bold; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;">📤 支出</div>{{EXPENSE_ROWS}}</div><div style="background:#FFF8E1; color:#F57F17; padding:15px; border-radius:12px; font-size:13px; border:1px solid #FFE082; line-height:1.5;">{{BILL_SUMMARY}}</div></div></div>
+
+    <div id="tiktok" class="app-window" style="background:#000;"><div class="app-back-btn" style="color:#fff;" onclick="closeAll()">❮</div><h2 style="color:#fff; text-align:center; padding-top:100px;">抖音界面</h2></div>
+
+    <div class="home-bar" onclick="closeAll()"></div>
+    <audio id="bgm" src="https://cdn.pixabay.com/download/audio/2022/02/22/audio_d1718ab41b.mp3" loop></audio>
+
+    <div id="music-app" class="app-window">
+        <div class="app-back-btn" style="color:#fff;" onclick="closeAll()">❮</div>
+        <div class="music-disc"></div>
+        <div class="music-title">正在播放...</div>
+        <div class="music-artist">Kelivo Music</div>
+        <div class="music-controls">
+            <div class="m-btn">⏮</div>
+            <div class="m-btn m-play" onclick="toggleMusic(event)">⏯</div>
+            <div class="m-btn">⏭</div>
+        </div>
+    </div>
+
+    <script>
+        const photoData = [
+            { url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3", text: "又在偷看别人日记" }, 
+            { url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3", text: "听风，看云，做个懒骨头。" }
+        ];
+        let lastPhotoIdx = -1;
+
+        function openPolaroid() {
+            const overlay = document.getElementById('polaroid-overlay');
+            const img = document.getElementById('polaroid-img');
+            const textEl = document.getElementById('polaroid-text');
+            let idx; do { idx = Math.floor(Math.random() * photoData.length); } while (idx === lastPhotoIdx && photoData.length > 1); lastPhotoIdx = idx;
+            const item = photoData[idx];
+            textEl.innerText = item.text;
+            const sfx = new Audio('https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3'); 
+            sfx.play();
+            overlay.style.display = 'flex';
+            setTimeout(() => { overlay.classList.add('active'); img.classList.add('animate'); textEl.classList.add('show'); }, 10);
+        }
+
+        function closePolaroid(e) {
+            if(e && e.target.id !== 'polaroid-overlay') return; 
+            const overlay = document.getElementById('polaroid-overlay');
+            const img = document.getElementById('polaroid-img');
+            const textEl = document.getElementById('polaroid-text');
+            overlay.classList.remove('active'); img.classList.remove('animate'); textEl.classList.remove('show');
+            setTimeout(() => { overlay.style.display = 'none'; }, 300);
+        }
+
+        function openDiary(e) { e.stopPropagation(); document.getElementById('polaroid-overlay').style.display = 'none'; document.getElementById('diary-app').style.display = 'flex'; }
+        function closeDiary() { document.getElementById('diary-app').style.display = 'none'; }
+
+        function toggleSearch(show) { document.getElementById('search-suggestions').style.display = show ? 'block' : 'none'; }
+        function showBrPage(type) {
+            const listPage = document.getElementById('br-list-page'); const listBody = document.getElementById('br-list-body'); const listTitle = document.getElementById('br-list-title');
+            listPage.classList.add('active');
+            if(type === 'history') { listTitle.innerText = "历史记录"; listBody.innerHTML = document.getElementById('data-history').innerHTML; } 
+            else if(type === 'favorites') { listTitle.innerText = "收藏夹"; listBody.innerHTML = document.getElementById('data-favorites').innerHTML; }
+        }
+        function closeBrPage() { document.querySelectorAll('.br-page').forEach(p => p.classList.remove('active')); }
+        function openWeb(title, content) {
+            const contentPage = document.getElementById('br-content-page');
+            document.getElementById('br-url-bar').innerText = 'kelivo.com/search?q=' + title;
+            document.getElementById('br-body-content').innerHTML = '<h3>' + title + '</h3><p>' + content + '</p>';
+            contentPage.classList.add('active'); document.getElementById('search-suggestions').style.display = 'none';
+        }
+
+        const CALL_SCENARIO = "{{CALL_SCENARIO}}"; const CALL_SCRIPT = {{CALL_SCRIPT}}; let attemptCount=0, timerInterval=null, snowInterval=null;
+        const sfxKey = new Audio('https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3'); 
+        const sfxCall = new Audio('https://cdn.pixabay.com/download/audio/2021/08/04/audio_bb630cc098.mp3');
+        const sfxEnd = new Audio('https://cdn.pixabay.com/download/audio/2022/03/15/audio_791e8a811d.mp3');
+
+        function switchPhoneTab(idx) { document.querySelectorAll('.ph-tab').forEach((t,i) => t.classList.toggle('active', i===idx)); document.querySelectorAll('.ph-pane').forEach((p,i) => p.classList.toggle('active', i===idx)); }
+        function dial(num) { const d=document.getElementById('dial-number'); if(d.innerText.length<13) d.innerText+=num; if(navigator.vibrate) navigator.vibrate(10); sfxKey.currentTime = 0; sfxKey.play(); }
+        function delNum() { const d=document.getElementById('dial-number'); d.innerText=d.innerText.slice(0,-1); }
+        function quickDial(num) { switchPhoneTab(0); document.getElementById('dial-number').innerText=num; makeCall(); }
+        
+        function makeCall() { 
+            const n=document.getElementById('dial-number').innerText.replace(/-/g, ''); if(!n)return; 
+            const s=document.getElementById('dial-status'); s.innerText="正在呼叫 "+n+"..."; s.style.opacity=1; 
+            document.getElementById('call-btn').style.display='none'; document.getElementById('hang-btn').style.display='flex'; 
+            sfxCall.currentTime = 0; sfxCall.loop = true; sfxCall.play();
+            setTimeout(()=>{ 
+                if(CALL_SCENARIO==='reject'){ if(attemptCount<2){ s.innerText="对方正在通话中..."; setTimeout(hangUp,1500); attemptCount++; }else{ startInCallUI(); } }else{ startInCallUI(); } 
+            },2000); 
+        }
+        
+        function hangUp() { document.getElementById('dial-number').innerText=""; document.getElementById('dial-status').style.opacity=0; document.getElementById('call-btn').style.display='flex'; document.getElementById('hang-btn').style.display='none'; endCall(); }
+        
+        function startInCallUI() { 
+            sfxCall.pause(); const o=document.getElementById('incall-overlay'); o.style.display='flex'; let s=0; 
+            document.getElementById('call-caption').innerText="输入文字中..."; document.getElementById('call-caption').classList.add('show'); startSnow(); 
+            timerInterval=setInterval(()=>{ s++; const m=Math.floor(s/60).toString().padStart(2,'0'); const sc=(s%60).toString().padStart(2,'0'); document.getElementById('call-timer').innerText=m+':'+sc; },1000); 
+            let i=0; function p(){ if(i<CALL_SCRIPT.length){ document.getElementById('call-caption').style.opacity=0; setTimeout(()=>{ document.getElementById('call-caption').innerText=CALL_SCRIPT[i]; document.getElementById('call-caption').style.opacity=1; i++; setTimeout(p,2500); },300); }else{ document.getElementById('call-caption').innerText="(通话结束)"; } } setTimeout(p,1500); 
+        }
+        
+        function endCall() { sfxCall.pause(); sfxEnd.play(); document.getElementById('incall-overlay').style.display='none'; clearInterval(timerInterval); stopSnow(); document.getElementById('call-timer').innerText="00:00"; document.getElementById('dial-status').innerText=""; document.getElementById('call-btn').style.display='flex'; document.getElementById('hang-btn').style.display='none'; }
+        function startSnow() { if(snowInterval)return; snowInterval=setInterval(()=>{ const b=document.createElement('div'); b.className='snowflake'; b.innerText='❄️'; b.style.left=Math.random()*100+'vw'; b.style.animationDuration=Math.random()*3+2+'s'; b.style.opacity=Math.random(); b.style.fontSize=(Math.random()*10+15)+'px'; document.getElementById('incall-overlay').appendChild(b); setTimeout(()=>b.remove(),5000); },300); }
+        function stopSnow() { clearInterval(snowInterval); snowInterval=null; document.querySelectorAll('.snowflake').forEach(s=>s.remove()); }
+
+        function switchTab(tabName, el) { document.querySelectorAll('.wx-tab').forEach(t => t.classList.remove('active')); el.classList.add('active'); document.querySelectorAll('.wx-page').forEach(p => p.classList.remove('active')); const target = document.getElementById('tab-' + tabName); if(target) target.classList.add('active'); const titles = { 'chat': '微信(1)', 'contact': '通讯录', 'discover': '发现', 'me': '我' }; document.querySelector('#wx-main-title span').innerText = titles[tabName] || '微信'; }
+        const npcReplyPool = ["好呀！", "真的吗？", "哈哈，太有趣了！", "我也这么觉得~", "晚安啦！"]; const momentsReplyPool = ["谢谢！", "下次一起去呀~", "哈哈，被你发现了。"];
+        function sendMsg() { const i=document.getElementById('wx-input'); if(!i.value)return; const b=document.getElementById('chat-box'); b.innerHTML+='<div class="msg-row self"><div class="chat-avatar" style="background-image: url(\'{{AVATAR_USER}}\')"></div><div class="bubble">'+i.value+'</div></div>'; i.value=''; b.scrollTop=b.scrollHeight; setTimeout(()=>{ let r=npcReplyPool.length>0?npcReplyPool[Math.floor(Math.random()*npcReplyPool.length)]:"嗯。"; b.innerHTML+='<div class="msg-row other"><div class="chat-avatar" style="background-image: url(\'{{AVATAR_CHAR}}\')"></div><div class="bubble">'+r+'</div></div>'; b.scrollTop=b.scrollHeight; },1500); }
+        let currentMoment = null;
+        function toggleActionMenu(btn) { document.querySelectorAll('.m-popover').forEach(el => el.classList.remove('show')); btn.querySelector('.m-popover').classList.toggle('show'); currentMoment = btn.closest('.moment-item'); event.stopPropagation(); }
+        function toggleLike(e) { e.stopPropagation(); const l = currentMoment.querySelector('.m-likes-list'); if(!l.innerText.includes('{{USER_NAME}}')) l.innerHTML += ', <span class="m-user">{{USER_NAME}}</span>'; document.querySelectorAll('.m-popover').forEach(el => el.classList.remove('show')); }
+        function showCommentInput(e) { e.stopPropagation(); document.getElementById('m-input-bar').classList.add('show'); document.getElementById('m-input').focus(); document.querySelectorAll('.m-popover').forEach(el => el.classList.remove('show')); }
+        function submitComment() { const i=document.getElementById('m-input'); if(!i.value)return; let l=currentMoment.querySelector('.m-comment-list'); if(!l){ l=document.createElement('div'); l.className='m-comment-list'; currentMoment.querySelector('.m-comments-area').appendChild(l); } l.innerHTML+='<div class="m-comment-row"><span class="m-user">{{USER_NAME}}</span>：'+i.value+'</div>'; setTimeout(()=>{ let r=momentsReplyPool.length>0?momentsReplyPool[Math.floor(Math.random()*momentsReplyPool.length)]:"ok"; let lr=currentMoment.querySelector('.m-comment-list'); if(lr) lr.innerHTML+='<div class="m-comment-row"><span class="m-user">{{CHAR_NAME}}</span>回复<span class="m-user">{{USER_NAME}}</span>：'+r+'</div>'; },2000); i.value=''; document.getElementById('m-input-bar').classList.remove('show'); }
+        document.body.addEventListener('click', () => { document.querySelectorAll('.m-popover').forEach(el => el.classList.remove('show')); document.getElementById('m-input-bar').classList.remove('show'); });
+        function openChat(){ document.getElementById('wx-chat-view').style.display='flex'; }
+        function closeChat(){ document.getElementById('wx-chat-view').style.display='none'; }
+        function openMoments() { document.getElementById('wx-moments-view').style.display = 'flex'; }
+        function closeMoments() { document.getElementById('wx-moments-view').style.display = 'none'; }
+
+        const GRID = [{x:0,y:10}, {x:80,y:10}, {x:0,y:90}, {x:80,y:90}];
+        let icons=Array.from(document.querySelectorAll('.app-icon')), isEditMode=false, activeIcon=null, longPressTimer, startX, startY, initX, initY;
+        function render(){ icons.forEach(i=>{ if(i!==activeIcon){ const p=GRID[i.dataset.idx]; i.style.left=p.x+'px'; i.style.top=p.y+'px'; } }); }
+        render();
+        icons.forEach(icon => {
+            icon.addEventListener('touchstart', (e)=>{ longPressTimer = setTimeout(()=>startEdit(), 500); const t=e.touches[0]; startX=t.clientX; startY=t.clientY; initX=icon.offsetLeft; initY=icon.offsetTop; if(isEditMode){ activeIcon=icon; icon.classList.add('dragging'); icon.classList.remove('shaking'); } }, {passive:false});
+            icon.addEventListener('touchmove', (e)=>{ if(!isEditMode && !activeIcon){ clearTimeout(longPressTimer); return; } if(isEditMode) e.preventDefault(); if(activeIcon){ const t=e.touches[0]; activeIcon.style.left=(initX+t.clientX-startX)+'px'; activeIcon.style.top=(initY+t.clientY-startY)+'px'; checkSwap(activeIcon); } }, {passive:false});
+            icon.addEventListener('touchend', ()=>{ clearTimeout(longPressTimer); if(activeIcon){ activeIcon.classList.remove('dragging'); activeIcon.classList.add('shaking'); activeIcon=null; render(); } });
+        });
+        function startEdit(){ if(isEditMode)return; isEditMode=true; if(navigator.vibrate)navigator.vibrate(50); icons.forEach(i=>i.classList.add('shaking')); }
+        function exitEditMode(e){ if(isEditMode && !e.target.classList.contains('app-icon')){ isEditMode=false; icons.forEach(i=>i.classList.remove('shaking')); } }
+        function checkSwap(dragged){ const r1=dragged.getBoundingClientRect(); icons.forEach(target=>{ if(target!==dragged){ const r2=target.getBoundingClientRect(); if(Math.hypot((r1.left+r1.width/2)-(r2.left+r2.width/2), (r1.top+r1.height/2)-(r2.top+r2.height/2))<50){ const t=dragged.dataset.idx; dragged.dataset.idx=target.dataset.idx; target.dataset.idx=t; if(navigator.vibrate)navigator.vibrate(10); render(); } } }); }
+        function handleClick(id){ if(!isEditMode) openApp(id); }
+        function openApp(id){ document.getElementById(id).style.display='flex'; }
+        function closeAll(){ document.querySelectorAll('.app-window').forEach(d=>d.style.display='none'); }
+        function toggleMusic(e){ e.stopPropagation(); const r=document.getElementById('record'), l=document.getElementById('lyricsBox'), a=document.getElementById('bgm'); if(r.classList.contains('playing')){ r.classList.remove('playing'); l.classList.remove('show'); a.pause(); }else{ r.classList.add('playing'); l.classList.add('show'); a.play(); } }
+    </script>
+</body>
+</html
