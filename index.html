@@ -190,6 +190,9 @@
         .settings-row-title { font-size: 14px; color: #555; margin-bottom: 8px; }
         .settings-input, .settings-select, .settings-textarea { width: 100%; border: 1px solid #e0e0e0; border-radius: 10px; background: #fafafa; padding: 10px 12px; font-size: 14px; color: #222; font-family: -apple-system, "Microsoft YaHei", sans-serif; }
         .settings-textarea { min-height: 90px; resize: vertical; }
+        .settings-inline-actions { display: flex; gap: 10px; margin-top: 10px; }
+        .settings-inline-actions .settings-btn { flex: 0 0 auto; padding: 10px 12px; font-size: 14px; }
+        .settings-hint { font-size: 12px; color: #8c8c8c; margin-top: 8px; line-height: 1.4; }
         .settings-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         .settings-switch-label { font-size: 16px; color: #222; }
         .settings-status { font-size: 13px; color: #888; line-height: 1.5; padding: 0 15px 12px; }
@@ -435,7 +438,13 @@
                     </div>
                     <div class="settings-row">
                         <div class="settings-row-title">Model</div>
-                        <input id="aiModel" class="settings-input" type="text" placeholder="gpt-4o-mini">
+                        <select id="aiModel" class="settings-select">
+                            <option value="gpt-4o-mini">gpt-4o-mini</option>
+                        </select>
+                        <div class="settings-inline-actions">
+                            <button class="settings-btn secondary" type="button" onclick="fetchAIModels()">Fetch Models</button>
+                        </div>
+                        <div class="settings-hint" id="aiModelHint">Enter your base URL and API key, then fetch available models.</div>
                     </div>
                     <div class="settings-row">
                         <div class="settings-row-title">API key</div>
@@ -601,10 +610,67 @@
             if (!baseUrlInput || !modelInput) return;
             if (provider === 'anthropic') {
                 if (!baseUrlInput.value.trim() || baseUrlInput.value.includes('openai.com')) baseUrlInput.value = 'https://api.anthropic.com';
-                if (!modelInput.value.trim() || modelInput.value === 'gpt-4o-mini') modelInput.value = 'claude-sonnet-4-6';
+                if (!modelInput.value.trim() || modelInput.value === 'gpt-4o-mini') setModelOptions(['claude-sonnet-4-6'], 'claude-sonnet-4-6');
             } else {
                 if (!baseUrlInput.value.trim() || baseUrlInput.value.includes('anthropic.com')) baseUrlInput.value = 'https://api.openai.com/v1';
-                if (!modelInput.value.trim() || modelInput.value === 'claude-sonnet-4-6') modelInput.value = 'gpt-4o-mini';
+                if (!modelInput.value.trim() || modelInput.value === 'claude-sonnet-4-6') setModelOptions(['gpt-4o-mini'], 'gpt-4o-mini');
+            }
+        }
+        function setModelOptions(models, selectedValue) {
+            const modelSelect = document.getElementById('aiModel');
+            if (!modelSelect) return;
+            const uniqueModels = Array.from(new Set((models || []).filter(Boolean)));
+            modelSelect.innerHTML = uniqueModels.map(model => '<option value="' + escapeHtml(model) + '">' + escapeHtml(model) + '</option>').join('');
+            if (!uniqueModels.length) {
+                modelSelect.innerHTML = '<option value="">No models found</option>';
+                return;
+            }
+            modelSelect.value = uniqueModels.includes(selectedValue) ? selectedValue : uniqueModels[0];
+        }
+        async function fetchAIModels() {
+            const provider = document.getElementById('aiProvider')?.value || 'openai';
+            const baseUrl = document.getElementById('aiBaseUrl')?.value?.trim() || '';
+            const apiKey = document.getElementById('aiApiKey')?.value?.trim() || '';
+            const hint = document.getElementById('aiModelHint');
+            if (!baseUrl || !apiKey) {
+                if (hint) hint.textContent = 'Add both a base URL and API key first.';
+                return;
+            }
+            if (location.protocol === 'file:') {
+                if (hint) hint.textContent = 'Fetching models does not work when the HTML file is opened directly. Use a hosted URL.';
+                return;
+            }
+            if (hint) hint.textContent = 'Fetching models...';
+            try {
+                let models = [];
+                if (provider === 'anthropic') {
+                    const response = await fetch(baseUrl.replace(/\/$/, '') + '/v1/models', {
+                        headers: {
+                            'x-api-key': apiKey,
+                            'anthropic-version': '2023-06-01',
+                            'anthropic-dangerous-direct-browser-access': 'true',
+                        },
+                    });
+                    if (!response.ok) throw new Error('Failed to fetch models (' + response.status + ')');
+                    const data = await response.json();
+                    models = (data.data || []).map(item => item.id).filter(Boolean);
+                } else {
+                    const response = await fetch(baseUrl.replace(/\/$/, '') + '/models', {
+                        headers: {
+                            'Authorization': 'Bearer ' + apiKey,
+                        },
+                    });
+                    if (!response.ok) throw new Error('Failed to fetch models (' + response.status + ')');
+                    const data = await response.json();
+                    models = (data.data || []).map(item => item.id).filter(Boolean);
+                }
+                if (!models.length) throw new Error('No models were returned.');
+                models.sort();
+                setModelOptions(models, models[0]);
+                if (hint) hint.textContent = 'Loaded ' + models.length + ' model' + (models.length === 1 ? '' : 's') + '.';
+            } catch (err) {
+                console.error(err);
+                if (hint) hint.textContent = err.message || 'Could not fetch models.';
             }
         }
         function renderAISettingsForm() {
@@ -619,10 +685,12 @@
             enabled.checked = !!settings.enabled;
             provider.value = settings.provider || 'openai';
             baseUrl.value = settings.baseUrl || '';
-            model.value = settings.model || '';
+            setModelOptions([settings.model || (provider.value === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-4o-mini')], settings.model || '');
             apiKey.value = settings.apiKey || '';
             systemPrompt.value = settings.systemPrompt || '';
             setAIStatus(settings.enabled && settings.apiKey ? 'AI replies are enabled for this phone.' : 'AI is off. Chat will use the built-in reply mode.');
+            const hint = document.getElementById('aiModelHint');
+            if (hint) hint.textContent = 'Enter your base URL and API key, then fetch available models.';
         }
         function openAISettings() {
             renderAISettingsForm();
