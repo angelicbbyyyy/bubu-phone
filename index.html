@@ -730,29 +730,53 @@
             modelSelect.value = uniqueModels.includes(selectedValue) ? selectedValue : uniqueModels[0];
         }
         function extractModelNames(payload) {
-            const rawItems = Array.isArray(payload?.data) ? payload.data
-                : Array.isArray(payload?.models) ? payload.models
-                : Array.isArray(payload) ? payload
-                : [];
-            return rawItems
-                .map(item => {
-                    if (!item) return '';
-                    if (typeof item === 'string') return item;
-                    if (typeof item === 'object') {
-                        return item.id || item.name || item.model || '';
+            var rawItems = [];
+            if (payload && Array.isArray(payload.data)) {
+                rawItems = payload.data;
+            } else if (payload && Array.isArray(payload.models)) {
+                rawItems = payload.models;
+            } else if (Array.isArray(payload)) {
+                rawItems = payload;
+            }
+            var names = [];
+            for (var i = 0; i < rawItems.length; i += 1) {
+                var item = rawItems[i];
+                var name = '';
+                if (!item) {
+                    continue;
+                }
+                if (typeof item === 'string') {
+                    name = item;
+                } else if (typeof item === 'object') {
+                    if (typeof item.id === 'string' && item.id) {
+                        name = item.id;
+                    } else if (typeof item.name === 'string' && item.name) {
+                        name = item.name;
+                    } else if (typeof item.model === 'string' && item.model) {
+                        name = item.model;
                     }
-                    return '';
-                })
-                .filter(Boolean)
-                .map(name => String(name).replace(/^models\//, ''));
+                }
+                if (!name) {
+                    continue;
+                }
+                names.push(String(name).replace(/^models\//, ''));
+            }
+            return names;
         }
         async function fetchAIModels() {
-            const provider = document.getElementById('aiProvider')?.value || 'openai';
-            const baseUrl = document.getElementById('aiBaseUrl')?.value?.trim() || '';
-            const apiKey = document.getElementById('aiApiKey')?.value?.trim() || '';
-            const modelsPath = document.getElementById('aiModelsPath')?.value?.trim() || '/models';
-            const authMode = document.getElementById('aiAuthMode')?.value || 'bearer';
-            const hint = document.getElementById('aiModelHint');
+            var providerEl = document.getElementById('aiProvider');
+            var baseUrlEl = document.getElementById('aiBaseUrl');
+            var apiKeyEl = document.getElementById('aiApiKey');
+            var modelsPathEl = document.getElementById('aiModelsPath');
+            var authModeEl = document.getElementById('aiAuthMode');
+            var formatEl = document.getElementById('aiFormat');
+            var hint = document.getElementById('aiModelHint');
+            var provider = providerEl && providerEl.value ? providerEl.value : 'openai';
+            var baseUrl = baseUrlEl && baseUrlEl.value ? baseUrlEl.value.trim() : '';
+            var apiKey = apiKeyEl && apiKeyEl.value ? apiKeyEl.value.trim() : '';
+            var modelsPath = modelsPathEl && modelsPathEl.value ? modelsPathEl.value.trim() : '/models';
+            var authMode = authModeEl && authModeEl.value ? authModeEl.value : 'bearer';
+            var format = formatEl && formatEl.value ? formatEl.value : 'openai';
             if (!baseUrl || !apiKey) {
                 if (hint) hint.textContent = 'Add both a base URL and API key first.';
                 return;
@@ -763,7 +787,7 @@
             }
             if (hint) hint.textContent = 'Fetching models...';
             try {
-                let models = [];
+                var models = [];
                 if (provider === 'anthropic') {
                     const response = await fetch(joinProviderUrl(baseUrl, '/v1/models', '/v1/models'), {
                         headers: {
@@ -776,7 +800,7 @@
                     const data = await response.json();
                     models = extractModelNames(data);
                 } else {
-                    const isGoogle = (document.getElementById('aiFormat')?.value || '') === 'google';
+                    const isGoogle = format === 'google';
                     const url = joinProviderUrl(baseUrl, provider === 'custom' ? modelsPath : '/models', '/models');
                     const response = await fetch(isGoogle ? appendApiKeyQuery(url, apiKey) : url, {
                         headers: isGoogle ? {} : {
@@ -784,7 +808,13 @@
                         },
                     });
                     if (!response.ok) throw new Error('Failed to fetch models (' + response.status + ')');
-                    const data = await response.json();
+                    const rawText = await response.text();
+                    let data = null;
+                    try {
+                        data = JSON.parse(rawText);
+                    } catch (parseErr) {
+                        throw new Error('Model list returned invalid JSON.');
+                    }
                     models = extractModelNames(data);
                 }
                 if (!models.length) throw new Error('No models were returned.');
