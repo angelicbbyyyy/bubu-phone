@@ -729,6 +729,23 @@
             }
             modelSelect.value = uniqueModels.includes(selectedValue) ? selectedValue : uniqueModels[0];
         }
+        function extractModelNames(payload) {
+            const rawItems = Array.isArray(payload?.data) ? payload.data
+                : Array.isArray(payload?.models) ? payload.models
+                : Array.isArray(payload) ? payload
+                : [];
+            return rawItems
+                .map(item => {
+                    if (!item) return '';
+                    if (typeof item === 'string') return item;
+                    if (typeof item === 'object') {
+                        return item.id || item.name || item.model || '';
+                    }
+                    return '';
+                })
+                .filter(Boolean)
+                .map(name => String(name).replace(/^models\//, ''));
+        }
         async function fetchAIModels() {
             const provider = document.getElementById('aiProvider')?.value || 'openai';
             const baseUrl = document.getElementById('aiBaseUrl')?.value?.trim() || '';
@@ -757,7 +774,7 @@
                     });
                     if (!response.ok) throw new Error('Failed to fetch models (' + response.status + ')');
                     const data = await response.json();
-                    models = (data.data || []).map(item => item.id).filter(Boolean);
+                    models = extractModelNames(data);
                 } else {
                     const isGoogle = (document.getElementById('aiFormat')?.value || '') === 'google';
                     const url = joinProviderUrl(baseUrl, provider === 'custom' ? modelsPath : '/models', '/models');
@@ -768,7 +785,7 @@
                     });
                     if (!response.ok) throw new Error('Failed to fetch models (' + response.status + ')');
                     const data = await response.json();
-                    models = (data.data || data.models || []).map(item => item.id || item.name).filter(Boolean).map(name => String(name).replace(/^models\//, ''));
+                    models = extractModelNames(data);
                 }
                 if (!models.length) throw new Error('No models were returned.');
                 models.sort();
